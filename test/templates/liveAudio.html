@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Audio Recording</title>
+
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        font-family: "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #1f3c88, #020b1f);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+
+    .container {
+        background: linear-gradient(145deg, #1b2f55, #223c68);
+        padding: 40px;
+        border-radius: 24px;
+        width: 440px;
+        text-align: center;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+    }
+
+    h1 {
+        color: #7aa2ff;
+        margin-bottom: 20px;
+    }
+
+    button {
+        padding: 12px 26px;
+        margin: 10px;
+        border-radius: 12px;
+        border: none;
+        font-size: 16px;
+        cursor: pointer;
+        background: linear-gradient(135deg, #2d6cdf, #1b4fb3);
+        color: #fff;
+        transition: 0.3s;
+    }
+
+    button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(45,108,223,0.6);
+    }
+
+    button:disabled {
+        background: #555;
+        cursor: not-allowed;
+    }
+
+    .timer {
+        font-size: 18px;
+        margin-top: 10px;
+        color: #00ffcc;
+    }
+
+    .status {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #cfd8ff;
+    }
+
+    .result {
+        margin-top: 20px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #00ffcc;
+    }
+
+    .error {
+        color: #ff6b6b;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🎤 Live Audio Recording</h1>
+
+    <button id="recordBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+
+    <div class="timer" id="timer">00:00</div>
+    <div class="status" id="status">Click "Start Recording"</div>
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let startTime;
+let timerInterval;
+
+const recordBtn = document.getElementById("recordBtn");
+const stopBtn = document.getElementById("stopBtn");
+const statusText = document.getElementById("status");
+const resultText = document.getElementById("result");
+const timerText = document.getElementById("timer");
+
+function startTimer() {
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        timerText.innerText =
+            String(Math.floor(elapsed / 60)).padStart(2, "0") + ":" +
+            String(elapsed % 60).padStart(2, "0");
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+}
+
+recordBtn.onclick = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = sendAudioToBackend;
+
+        mediaRecorder.start();
+        startTimer();
+
+        statusText.innerText = "Recording...";
+        resultText.innerText = "";
+        recordBtn.disabled = true;
+        stopBtn.disabled = false;
+    } catch {
+        statusText.innerText = "Microphone access denied";
+        statusText.classList.add("error");
+    }
+};
+
+stopBtn.onclick = () => {
+    mediaRecorder.stop();
+    stopTimer();
+
+    recordBtn.disabled = false;
+    stopBtn.disabled = true;
+    statusText.innerText = "Analyzing audio...";
+};
+
+function sendAudioToBackend() {
+    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "live.wav");
+
+    fetch("/predict-live", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            resultText.innerText = data.error;
+            resultText.classList.add("error");
+        } else {
+            resultText.innerHTML =
+                `Prediction: ${data.result}<br>
+                 Truth: ${(data.truth_probability * 100).toFixed(1)}%<br>
+                 Lie: ${(data.lie_probability * 100).toFixed(1)}%`;
+        }
+        statusText.innerText = "Done";
+    })
+    .catch(() => {
+        resultText.innerText = "Server error";
+        resultText.classList.add("error");
+        statusText.innerText = "Failed";
+    });
+}
+</script>
+
+</body>
+</html>

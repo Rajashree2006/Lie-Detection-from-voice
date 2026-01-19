@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Audio Analysis Dashboard</title>
+
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at top, #1f3c88, #020b1f);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+
+    .dashboard {
+        width: 900px;
+        background: linear-gradient(145deg, #1b2f55, #223c68);
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+
+    h1 {
+        text-align: center;
+        color: #7aa2ff;
+        font-size: 36px;
+        margin-bottom: 40px;
+    }
+
+    .cards {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+    }
+
+    .card {
+        flex: 1;
+        background: linear-gradient(145deg, #0f1c33, #162b4d);
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+    }
+
+    .btn {
+        padding: 12px 28px;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #2d6cdf, #1b4fb3);
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 15px;
+    }
+
+    input[type="file"] {
+        margin: 15px 0;
+        color: #fff;
+    }
+
+    .result {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #00ffcc;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="dashboard">
+    <h1>Audio Analysis Dashboard</h1>
+
+    <div class="cards">
+
+        <!-- LIVE AUDIO -->
+        <div class="card">
+            <h2>🎤 Live Audio</h2>
+            <p>Record voice using microphone</p>
+
+            <!-- Flask route -->
+            <form action="/live" method="get">
+                <button class="btn" type="submit">Open Live Recording</button>
+            </form>
+        </div>
+
+        <!-- UPLOAD AUDIO -->
+        <div class="card">
+            <h2>📁 Upload Audio</h2>
+            <p>Upload WAV / MP3 / M4A file</p>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" name="audio" accept=".wav,.mp3,.m4a" required>
+                <br>
+                <button class="btn" type="submit">Upload & Analyze</button>
+            </form>
+
+            <div id="result" class="result"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.getElementById("uploadForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    const response = await fetch("/predict", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await response.json();
+
+    document.getElementById("result").innerHTML =
+        `Prediction: <b>${data.result}</b><br>
+         Truth: ${(data.truth_probability * 100).toFixed(1)}%<br>
+         Lie: ${(data.lie_probability * 100).toFixed(1)}%`;
+});
+</script>
+
+</body>
+</html>
